@@ -68,17 +68,12 @@ uint16_t EEMEM ICR1_latest = 0;
 #define EQUATION_solve_b(y,m,x) (y-(m*x))
 #define EQUATION_b EQUATION_solve_b(PWM_BIT_RESOL_MIN,EQUATION_m,CALIBSTEP_ADC_VALUE_MIN)
 
-uint8_t PWM_BIT_RESOL_SELECTED;
+
 uint8_t PWM_BIT_RESOL_SELECTED_latest;
 uint8_t EEMEM PWM_BIT_RESOL_SELECTED_EEMEM_latest = 0;
 
 float voltage_step;
 
-#define ADC_BIT_RESOL 8//12    //Bits
-//#define R2POWER16 ((uint32_t)0x00001<<ADC_BIT_RESOL)
-//#define VSTEP 1.5259e-04//(VOUT_MAX/( ((uint16_t)1)<<16 ))  //2^ADC_BIT_RESOL
-//#define VSTEP (VOUT_MAX/((float)R2POWER16) )  //2^ADC_BIT_RESOL
-#define VSTEP (VOUT_MAX/((uint32_t)0x00001<<ADC_BIT_RESOL))
 #define VOUT_OFFSET 11.285E-3 //Voltaje en reposo
 
 float vout; 
@@ -106,46 +101,18 @@ void ADC_config2ReadPotSetVoltStep(void)
     ADC_set_adjust(ADC_ADJUST_LEFT);//solo uso el registro superior para 8bits
     ADC_setBit_startConversion_On();
 }
-/*
-void ADC_config2MeasuringAnalogVoltage(void)
-{
-	//
-	ADC_setAutoTrigger_disabled();
-	ADC_disable();
-	//
-	ADC_set_channel(ADC_CH_1);
-	ADC_enable();
-	ADC_set_prescaler(ADC_PRESCALER_128);
-	//ADC_set_reference(ADC_REF_INTERNAL_2_56V);
-        ADC_set_reference(ADC_REF_AVCC);
-	ADC_setAutoTrigger_enabled();
-	ADC_setAutoTrigger_source(ADC_AUTOTRIGGER_SOURCE_FREE_RUNNING);
-        ADC_set_adjust(ADC_ADJUST_RIGHT);
-	ADC_setBit_startConversion_On();
-}
-*/
-
-//            //+++++++++++++++++++++++
-//            uint8_t adclow = ADCL;
-//            uint16_t adc16 = (((uint16_t)ADCH)<<8) + adclow;
-//            //
-//            //float VoltOuput = ( (adc16*5.0f)/1024.0f )*2;
-//            float VoltOuput = ( (adc16*10.07f)/1024.0f )*1;
-//            VoltOuput *= 1.0050f;
-//            dtostrf(VoltOuput,0,8, buff);
-//            lcdan_set_cursor_in_row1(0);
-//            lcdan_print_string(buff);
-//            lcdan_print_string("   V");
-//            //+++++++++++++++++++++++
 
 
-void readPotSetVoltStep(void)
+//void readPotSetVoltStep(void)
+
+int8_t updateIfChange(uint8_t *pwm_bit_resol_selected_latest)
 {  
     volatile uint8_t adclow = ADCL;//Captura la conversion actual, pero uso ADCH
     char buff[20];
+    static uint8_t PWM_BIT_RESOL_SELECTED;
     PWM_BIT_RESOL_SELECTED =  (uint8_t) ((ADCH*EQUATION_m) +  EQUATION_b);
     
-    if (PWM_BIT_RESOL_SELECTED_latest != PWM_BIT_RESOL_SELECTED)
+    if (*pwm_bit_resol_selected_latest != PWM_BIT_RESOL_SELECTED)
     {
         itoa(PWM_BIT_RESOL_SELECTED,buff ,10);
         lcdan_set_cursor_in_row0(0);
@@ -160,71 +127,28 @@ void readPotSetVoltStep(void)
         
         ConfigInputPin(DDRB, 1); //Disable output pin
         ICR1 = (uint16_t) (((uint32_t)0x00001<<PWM_BIT_RESOL_SELECTED) -1);
-        if ((PWM_BIT_RESOL_SELECTED_latest > 0) && (OCR1A>0))
+        if ((*pwm_bit_resol_selected_latest > 0) && (OCR1A>0))
         {
-            //si ha cambiado, entonces actualizar 
             //factor = 2^x/ OCR actual ;
             //OCR = 2^new/factor;//Valor actual de OCR
-            float factor = (1<<PWM_BIT_RESOL_SELECTED_latest) / OCR1A;
-            OCR1A = (int) ((1<<PWM_BIT_RESOL_SELECTED)/factor);
+            float factor = (1<<*pwm_bit_resol_selected_latest) / OCR1A;//antiguo
+            OCR1A = (int) ((1<<PWM_BIT_RESOL_SELECTED)/factor);//nuevo
         }
         else
         {
             OCR1A = 0;
         }
+        eeprom_update_word(&PWM, OCR1A);
+        eeprom_update_word(&ICR1_latest, ICR1);
         ConfigOutputPin(DDRB, 1); //Enable output pin
         //
         //Al ultimo recien actualiza el valor
-        PWM_BIT_RESOL_SELECTED_latest != PWM_BIT_RESOL_SELECTED;
-        
-        eeprom_update_byte(&PWM_BIT_RESOL_SELECTED_EEMEM_latest);
+        *pwm_bit_resol_selected_latest = PWM_BIT_RESOL_SELECTED;
+        eeprom_update_byte(&PWM_BIT_RESOL_SELECTED_EEMEM_latest, *pwm_bit_resol_selected_latest);
+        return 1;
     }
+    return 0;
 }    
-     
-
-/*
- void readPotSetVoltStep(void)
-{  
-    volatile uint8_t adclow = ADCL;//Captura la conversion actual, pero uso ADCH
-    char buff[20];
-    PWM_BIT_RESOL_SELECTED =  (uint8_t) ((ADCH*EQUATION_m) +  EQUATION_b);
-    itoa(PWM_BIT_RESOL_SELECTED,buff ,10);
-    
-    lcdan_set_cursor_in_row0(0);
-    lcdan_print_string(buff);
-    lcdan_print_string("-BIT ");
-    
-    //
-    voltage_step = (float)(VOUT_MAX/((uint32_t)0x00001<<PWM_BIT_RESOL_SELECTED));
-    dtostrf(voltage_step,0,6, buff);
-    lcdan_set_cursor_in_row0(7);
-    lcdan_print_string(buff);
-    lcdan_print_string("V");
-     
-    ICR1 = (uint16_t) (((uint32_t)0x00001<<PWM_BIT_RESOL_SELECTED) -1);
-}
-*/
-//void print_voltage_step(void)
-//{
-//    char bb[10];
-//    itoa(ADC_BIT_RESOL,bb ,10);
-//    lcdan_print_string(bb);
-//}
-    
-int8_t xxx()
-{
-    ICR1 = eeprom_read_word(&ICR1_latest);
-    if (ICR1_latest!= ICR1)
-    {
-        if (ICR1_latest == 0)
-        {
-            //significa que se ha grabado por primera en la EEPROM
-            //--> actualizar directamente
-        }
-        
-        ICR1_latest = ICR1;
-    }
-}
 void print_vout(float vout)
 {
     char buff[20];
@@ -239,11 +163,12 @@ int main(void)
     int counter0 = 0;
     int counter1 = 0;
 
+    ADC_config2ReadPotSetVoltStep();
+    
     lcdan_init();
     ConfigOutputPin(CONFIGIOxLCDAN_BK, PINxLCDAN_BK);
     PinTo1(PORTWxLCDAN_BK, PINxLCDAN_BK);
-
-    ADC_config2ReadPotSetVoltStep();
+    
     //        
     //Config to 1ms
     TCNT0 = 0x00;
@@ -262,18 +187,14 @@ int main(void)
     TCCR1A = (1 << COM1A1) | (0 << COM1A0) | (0 << COM1B1) | (0 << COM1B0) | (1 << WGM11) | (0 << WGM10);
     TCCR1B = (1 << WGM13) | (1 << WGM12) | (1 << CS10);
     TCNT1 = 0;
-    
-    //ICR1 = 0xFFFF; //16Bits
-    //ICR1 = (uint16_t) (((uint32_t)0x00001<<ADC_BIT_RESOL) -1);
-    //OCR1A = 0;
-    //OCR1A = 750;
-    readPotSetVoltStep();//get ICR1 value
-
-    OCR1A = eeprom_read_word(&PWM);
-
-    ICR1 = eeprom_read_word(&ICR1_latest);
+    //
     PWM_BIT_RESOL_SELECTED_latest = eeprom_read_byte(&PWM_BIT_RESOL_SELECTED_EEMEM_latest);
-   
+    if ( !updateIfChange(&PWM_BIT_RESOL_SELECTED_latest))//if not change, then, load from EEPROM
+    {
+        OCR1A = eeprom_read_word(&PWM);
+        ICR1 = eeprom_read_word(&ICR1_latest);
+    }
+   //
     ConfigOutputPin(DDRB, 1); //OC1A
    
     while (1)
@@ -291,7 +212,7 @@ int main(void)
             {
                 counter0 = 0;
                 //
-                readPotSetVoltStep();
+                updateIfChange(&PWM_BIT_RESOL_SELECTED_latest);
                 //
                 pinGetLevel_job();
                 //-
@@ -356,9 +277,7 @@ int main(void)
         
         //
         mainflag.sysTickMs = 0;
-
     }
-
     return 0;
 }
 
