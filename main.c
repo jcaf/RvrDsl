@@ -40,6 +40,22 @@
  +++++++++++++++++++++++
  proteger flash (modo 3): lectura y escritura
  avrdude -c usbasp -B10 -p m328P -U lock:w:0xFC:m
+ * 
+ * octave:1> 10/2^10
+ans = 9.7656e-03
+octave:2> 10/2^11
+ans = 4.8828e-03
+octave:3> 10/2^12
+ans = 2.4414e-03
+octave:4> 10/2^13
+ans = 1.2207e-03
+octave:5> 10/2^14
+ans = 6.1035e-04
+octave:6> 10/2^15
+ans = 3.0518e-04
+octave:7> 10/2^16
+ans = 1.5259e-04
+
  */
 #include <stdio.h>
 #include <stdlib.h>
@@ -52,8 +68,6 @@
 #include "adc/adc.h"
 #include "main.h"
 
-uint16_t EEMEM OCR1A_EEMEM = 0;
-uint16_t EEMEM ICR1_EEMEM = 0;
 
 #define VOUT_MAX 10.0f         //Volts
 
@@ -70,12 +84,14 @@ uint16_t EEMEM ICR1_EEMEM = 0;
 
 uint8_t PWM_RESOL_SELECTED;
 uint8_t EEMEM PWM_RESOL_SELECTED_EEMEM = 0;
+uint16_t EEMEM OCR1A_EEMEM = 0;
+uint16_t EEMEM ICR1_EEMEM = 0;
+float EEMEM vout_EEMEM = 0;
+float vout; 
 
 float voltage_step;
 
-#define VOUT_OFFSET 11.285E-3 //Voltaje en reposo
-
-float vout; 
+#define VOUT_OFFSET 12.2E-3 //Voltaje en reposo
 
 volatile struct _isr_flag
 {
@@ -106,9 +122,9 @@ void print_vout(float vout)
     char buff[20];
     dtostrf(vout,0,6, buff);
     lcdan_set_cursor_in_row1(0);
-    lcdan_print_string("V=");
+    //lcdan_print_string("V=");
     lcdan_print_string(buff);
-    lcdan_print_string("V  ");
+    lcdan_print_string("v");
 }
 
 void print_voltageStep(float voltage_step)
@@ -117,7 +133,7 @@ void print_voltageStep(float voltage_step)
     dtostrf(voltage_step,0,6, buff);
     lcdan_set_cursor_in_row0(7);
     lcdan_print_string(buff);
-    lcdan_print_string("V");
+    lcdan_print_string("v");
 }
 void print_pwm_bit_resol(uint8_t PWM_BIT_RESOL_SELECTED)
 {
@@ -125,8 +141,16 @@ void print_pwm_bit_resol(uint8_t PWM_BIT_RESOL_SELECTED)
     itoa(PWM_BIT_RESOL_SELECTED,buff ,10);
     lcdan_set_cursor_in_row0(0);
     lcdan_print_string(buff);
-    lcdan_print_string("-BIT ");
+    lcdan_print_string("-BIT");
 }
+void print_OCR1A(uint16_t ocr1a)
+{
+    char buff[20];
+    itoa(ocr1a,buff ,10);
+    lcdan_set_cursor_in_row1(11);
+    lcdan_print_string(buff);
+}
+
 uint8_t get_pwm_bitresol(void)
 {
     uint8_t adclow = ADCL;//Captura la conversion actual, pero uso ADCH
@@ -136,26 +160,29 @@ uint8_t get_pwm_bitresol(void)
 int8_t updatePWMRegsIfChange(uint8_t PWM_RESOL_SELECTED)
 {  
     uint8_t PWM_RESOL_SELECTED_latest = eeprom_read_byte(&PWM_RESOL_SELECTED_EEMEM);
+    
     if (PWM_RESOL_SELECTED_latest != PWM_RESOL_SELECTED)
     {
         //Disable output pin
         ConfigInputPin(DDRB, 1); 
-        ICR1 = (uint16_t) (((uint32_t)0x00001<<PWM_RESOL_SELECTED) -1);
+        
+        
+        
         if ((PWM_RESOL_SELECTED_latest > 0) && (OCR1A>0))
         {
-            //factor = 2^x/ OCR actual ;
-            //OCR = 2^new/factor;//Valor actual de OCR
-            float factor = (1<<PWM_RESOL_SELECTED_latest) / OCR1A;//antiguo
-            OCR1A = (int) ((1<<PWM_RESOL_SELECTED)/factor);//nuevo
+            float factor = ((float)OCR1A)/(((uint32_t)0x00001<<PWM_RESOL_SELECTED_latest)); //antiguo//factor = OCR actual/2^x;
+            OCR1A = (uint16_t) (((uint32_t)0x00001<<PWM_RESOL_SELECTED)*factor);            //nuevo//OCR = 2^new*factor;
         }
         else
         {
             OCR1A = 0;
         }
+        ICR1 = (uint16_t) (((uint32_t)0x00001<<PWM_RESOL_SELECTED) -1);
+        //Enable output pin
+        ConfigOutputPin(DDRB, 1); 
+
         eeprom_update_word(&OCR1A_EEMEM, OCR1A);
         eeprom_update_word(&ICR1_EEMEM, ICR1);
-        ConfigOutputPin(DDRB, 1); //Enable output pin
-        //
         //Al ultimo recien actualiza el valor
         eeprom_update_byte(&PWM_RESOL_SELECTED_EEMEM, PWM_RESOL_SELECTED);
         //
@@ -163,10 +190,19 @@ int8_t updatePWMRegsIfChange(uint8_t PWM_RESOL_SELECTED)
         //
         voltage_step = (float)(VOUT_MAX/((uint32_t)0x00001<<PWM_RESOL_SELECTED));
         print_voltageStep(voltage_step);
+        
+        print_OCR1A(OCR1A);
+        
+        lcdan_set_cursor_in_row1(0);
+        lcdan_print_string("Update!!!!");
 
         return 1;
     }
-    return 0;
+    else
+    {
+        return 0;
+    }
+    
 }    
 
 
@@ -202,15 +238,30 @@ int main(void)
     if (!updatePWMRegsIfChange(PWM_RESOL_SELECTED))//if not change, then, load from EEPROM
     {
         //Si no ha cambiado, entonces carga directamente de EEPROM al iniciar el programa
-        OCR1A = eeprom_read_word(&OCR1A_EEMEM);
         ICR1 = eeprom_read_word(&ICR1_EEMEM);
+        OCR1A = eeprom_read_word(&OCR1A_EEMEM);
+        
         ConfigOutputPin(DDRB, 1); //OC1A
         
         voltage_step = (float)(VOUT_MAX/((uint32_t)0x00001<<PWM_RESOL_SELECTED));
         print_pwm_bit_resol(PWM_RESOL_SELECTED);
         print_voltageStep(voltage_step);
+        print_OCR1A(OCR1A);
+        
+        lcdan_set_cursor_in_row1(0);
+        lcdan_print_string("NoUpdate");
     }
+//    else
+//    {
+//        lcdan_set_cursor_in_row1(0);
+//        lcdan_print_string("Update!");
+//    }
     
+//    vout = eeprom_read_float(&vout_EEMEM);
+//    print_vout(vout + VOUT_OFFSET);
+
+//    OCR1A = 0x0000; 
+//    while (1);
    
     while (1)
     {
@@ -241,14 +292,15 @@ int main(void)
                         vout -= voltage_step;//
                         print_vout(vout + VOUT_OFFSET);
                         
-                        lcdan_set_cursor_in_row1(15);
-                        lcdan_print_string("-");
+//                        lcdan_set_cursor_in_row1(15);
+//                        lcdan_print_string("-");
 
                         counter1 = 0;
                         mainflag.clearSignPlusMinus = 1;
                         
                         eeprom_update_word(&OCR1A_EEMEM, OCR1A);
-
+                        eeprom_update_float(&vout_EEMEM, vout);
+                        print_OCR1A(OCR1A);
                     }
                 }
                 //+
@@ -262,13 +314,15 @@ int main(void)
                         vout += voltage_step ;
                         print_vout(vout + VOUT_OFFSET);
                         
-                        lcdan_set_cursor_in_row1(15);
-                        lcdan_print_string("+");
-                        
+//                        lcdan_set_cursor_in_row1(15);
+//                        lcdan_print_string("+");
+//                        
                         counter1 = 0;
                         mainflag.clearSignPlusMinus = 1;
                         
                         eeprom_update_word(&OCR1A_EEMEM, OCR1A);
+                        eeprom_update_float(&vout_EEMEM, vout);
+                        print_OCR1A(OCR1A);
                     }
                 }
                // 
@@ -284,8 +338,8 @@ int main(void)
                     counter1  = 0;
                     mainflag.clearSignPlusMinus = 0;
 
-                    lcdan_set_cursor_in_row1(15);
-                    lcdan_print_string(" ");
+//                    lcdan_set_cursor_in_row1(15);
+//                    lcdan_print_string(" ");
                 }
             }
         }
