@@ -1,4 +1,6 @@
-/* 
+/*MPLAX IDE v6.25
+ * AVR GNU TOOL CHAIN 
+ *  
  * File:   main.c
  * Author: jcaf
  *
@@ -51,6 +53,7 @@
 #include "main.h"
 
 uint16_t EEMEM PWM = 0;
+uint16_t EEMEM ICR1_latest = 0;
 
 #define VOUT_MAX 10.0f         //Volts
 
@@ -66,6 +69,9 @@ uint16_t EEMEM PWM = 0;
 #define EQUATION_b EQUATION_solve_b(PWM_BIT_RESOL_MIN,EQUATION_m,CALIBSTEP_ADC_VALUE_MIN)
 
 uint8_t PWM_BIT_RESOL_SELECTED;
+uint8_t PWM_BIT_RESOL_SELECTED_latest;
+uint8_t EEMEM PWM_BIT_RESOL_SELECTED_EEMEM_latest = 0;
+
 float voltage_step;
 
 #define ADC_BIT_RESOL 8//12    //Bits
@@ -133,8 +139,51 @@ void ADC_config2MeasuringAnalogVoltage(void)
 //            //+++++++++++++++++++++++
 
 
-
 void readPotSetVoltStep(void)
+{  
+    volatile uint8_t adclow = ADCL;//Captura la conversion actual, pero uso ADCH
+    char buff[20];
+    PWM_BIT_RESOL_SELECTED =  (uint8_t) ((ADCH*EQUATION_m) +  EQUATION_b);
+    
+    if (PWM_BIT_RESOL_SELECTED_latest != PWM_BIT_RESOL_SELECTED)
+    {
+        itoa(PWM_BIT_RESOL_SELECTED,buff ,10);
+        lcdan_set_cursor_in_row0(0);
+        lcdan_print_string(buff);
+        lcdan_print_string("-BIT ");
+        //
+        voltage_step = (float)(VOUT_MAX/((uint32_t)0x00001<<PWM_BIT_RESOL_SELECTED));
+        dtostrf(voltage_step,0,6, buff);
+        lcdan_set_cursor_in_row0(7);
+        lcdan_print_string(buff);
+        lcdan_print_string("V");
+        
+        ConfigInputPin(DDRB, 1); //Disable output pin
+        ICR1 = (uint16_t) (((uint32_t)0x00001<<PWM_BIT_RESOL_SELECTED) -1);
+        if ((PWM_BIT_RESOL_SELECTED_latest > 0) && (OCR1A>0))
+        {
+            //si ha cambiado, entonces actualizar 
+            //factor = 2^x/ OCR actual ;
+            //OCR = 2^new/factor;//Valor actual de OCR
+            float factor = (1<<PWM_BIT_RESOL_SELECTED_latest) / OCR1A;
+            OCR1A = (int) ((1<<PWM_BIT_RESOL_SELECTED)/factor);
+        }
+        else
+        {
+            OCR1A = 0;
+        }
+        ConfigOutputPin(DDRB, 1); //Enable output pin
+        //
+        //Al ultimo recien actualiza el valor
+        PWM_BIT_RESOL_SELECTED_latest != PWM_BIT_RESOL_SELECTED;
+        
+        eeprom_update_byte(&PWM_BIT_RESOL_SELECTED_EEMEM_latest);
+    }
+}    
+     
+
+/*
+ void readPotSetVoltStep(void)
 {  
     volatile uint8_t adclow = ADCL;//Captura la conversion actual, pero uso ADCH
     char buff[20];
@@ -154,6 +203,7 @@ void readPotSetVoltStep(void)
      
     ICR1 = (uint16_t) (((uint32_t)0x00001<<PWM_BIT_RESOL_SELECTED) -1);
 }
+*/
 //void print_voltage_step(void)
 //{
 //    char bb[10];
@@ -161,6 +211,20 @@ void readPotSetVoltStep(void)
 //    lcdan_print_string(bb);
 //}
     
+int8_t xxx()
+{
+    ICR1 = eeprom_read_word(&ICR1_latest);
+    if (ICR1_latest!= ICR1)
+    {
+        if (ICR1_latest == 0)
+        {
+            //significa que se ha grabado por primera en la EEPROM
+            //--> actualizar directamente
+        }
+        
+        ICR1_latest = ICR1;
+    }
+}
 void print_vout(float vout)
 {
     char buff[20];
@@ -207,16 +271,11 @@ int main(void)
 
     OCR1A = eeprom_read_word(&PWM);
 
-    //OCR1A = 1.7F*(((uint32_t)0x00001<<ADC_BIT_RESOL))/VOUT_MAX;
+    ICR1 = eeprom_read_word(&ICR1_latest);
+    PWM_BIT_RESOL_SELECTED_latest = eeprom_read_byte(&PWM_BIT_RESOL_SELECTED_EEMEM_latest);
    
     ConfigOutputPin(DDRB, 1); //OC1A
-    
-    //
-    si ha cambiado, entonces actualizar 
-    //
-    factor = 2^x/ OCR actual ;
-    OCR = 2^new/factor;//Valor actual de OCR
-            
+   
     while (1)
     {
         
