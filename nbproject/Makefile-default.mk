@@ -51,17 +51,17 @@ OBJECTDIR=build/${CND_CONF}/${IMAGE_TYPE}
 DISTDIR=dist/${CND_CONF}/${IMAGE_TYPE}
 
 # Source Files Quoted if spaced
-SOURCEFILES_QUOTED_IF_SPACED=lcdan/lcdan.c lcdan/lcdan_aux.c pinGetLevel/pinGetLevel.c main.c adc/adc.c
+SOURCEFILES_QUOTED_IF_SPACED=adc/adc.c lcdan/lcdan.c lcdan/lcdan_aux.c pinGetLevel/pinGetLevel.c main.c
 
 # Object Files Quoted if spaced
-OBJECTFILES_QUOTED_IF_SPACED=${OBJECTDIR}/lcdan/lcdan.o ${OBJECTDIR}/lcdan/lcdan_aux.o ${OBJECTDIR}/pinGetLevel/pinGetLevel.o ${OBJECTDIR}/main.o ${OBJECTDIR}/adc/adc.o
-POSSIBLE_DEPFILES=${OBJECTDIR}/lcdan/lcdan.o.d ${OBJECTDIR}/lcdan/lcdan_aux.o.d ${OBJECTDIR}/pinGetLevel/pinGetLevel.o.d ${OBJECTDIR}/main.o.d ${OBJECTDIR}/adc/adc.o.d
+OBJECTFILES_QUOTED_IF_SPACED=${OBJECTDIR}/adc/adc.o ${OBJECTDIR}/lcdan/lcdan.o ${OBJECTDIR}/lcdan/lcdan_aux.o ${OBJECTDIR}/pinGetLevel/pinGetLevel.o ${OBJECTDIR}/main.o
+POSSIBLE_DEPFILES=${OBJECTDIR}/adc/adc.o.d ${OBJECTDIR}/lcdan/lcdan.o.d ${OBJECTDIR}/lcdan/lcdan_aux.o.d ${OBJECTDIR}/pinGetLevel/pinGetLevel.o.d ${OBJECTDIR}/main.o.d
 
 # Object Files
-OBJECTFILES=${OBJECTDIR}/lcdan/lcdan.o ${OBJECTDIR}/lcdan/lcdan_aux.o ${OBJECTDIR}/pinGetLevel/pinGetLevel.o ${OBJECTDIR}/main.o ${OBJECTDIR}/adc/adc.o
+OBJECTFILES=${OBJECTDIR}/adc/adc.o ${OBJECTDIR}/lcdan/lcdan.o ${OBJECTDIR}/lcdan/lcdan_aux.o ${OBJECTDIR}/pinGetLevel/pinGetLevel.o ${OBJECTDIR}/main.o
 
 # Source Files
-SOURCEFILES=lcdan/lcdan.c lcdan/lcdan_aux.c pinGetLevel/pinGetLevel.c main.c adc/adc.c
+SOURCEFILES=adc/adc.c lcdan/lcdan.c lcdan/lcdan_aux.c pinGetLevel/pinGetLevel.c main.c
 
 # Pack Options 
 PACK_COMPILER_OPTIONS=-I "${DFP_DIR}/include"
@@ -104,6 +104,12 @@ endif
 # ------------------------------------------------------------------------------------
 # Rules for buildStep: compile
 ifeq ($(TYPE_IMAGE), DEBUG_RUN)
+${OBJECTDIR}/adc/adc.o: adc/adc.c  .generated_files/flags/default/f22e1e4494a41745629358979b3fa28cac6ef162 .generated_files/flags/default/da39a3ee5e6b4b0d3255bfef95601890afd80709
+	@${MKDIR} "${OBJECTDIR}/adc" 
+	@${RM} ${OBJECTDIR}/adc/adc.o.d 
+	@${RM} ${OBJECTDIR}/adc/adc.o 
+	 ${MP_CC}  $(MP_EXTRA_CC_PRE) -mmcu=atmega328p ${PACK_COMPILER_OPTIONS} ${PACK_COMMON_OPTIONS} -g -DDEBUG  -gdwarf-2  -x c -c -D__$(MP_PROCESSOR_OPTION)__  -funsigned-char -funsigned-bitfields -Os -ffunction-sections -fdata-sections -fpack-struct -fshort-enums -Wall -MD -MP -MF "${OBJECTDIR}/adc/adc.o.d" -MT "${OBJECTDIR}/adc/adc.o.d" -MT ${OBJECTDIR}/adc/adc.o  -o ${OBJECTDIR}/adc/adc.o adc/adc.c  -DXPRJ_default=$(CND_CONF)  $(COMPARISON_BUILD) 
+	
 ${OBJECTDIR}/lcdan/lcdan.o: lcdan/lcdan.c  .generated_files/flags/default/be535f4ace10953cc039cef640945ffa0dfcbeb .generated_files/flags/default/da39a3ee5e6b4b0d3255bfef95601890afd80709
 	@${MKDIR} "${OBJECTDIR}/lcdan" 
 	@${RM} ${OBJECTDIR}/lcdan/lcdan.o.d 
@@ -128,13 +134,13 @@ ${OBJECTDIR}/main.o: main.c  .generated_files/flags/default/50d79929edd4642ff9a5
 	@${RM} ${OBJECTDIR}/main.o 
 	 ${MP_CC}  $(MP_EXTRA_CC_PRE) -mmcu=atmega328p ${PACK_COMPILER_OPTIONS} ${PACK_COMMON_OPTIONS} -g -DDEBUG  -gdwarf-2  -x c -c -D__$(MP_PROCESSOR_OPTION)__  -funsigned-char -funsigned-bitfields -Os -ffunction-sections -fdata-sections -fpack-struct -fshort-enums -Wall -MD -MP -MF "${OBJECTDIR}/main.o.d" -MT "${OBJECTDIR}/main.o.d" -MT ${OBJECTDIR}/main.o  -o ${OBJECTDIR}/main.o main.c  -DXPRJ_default=$(CND_CONF)  $(COMPARISON_BUILD) 
 	
-${OBJECTDIR}/adc/adc.o: adc/adc.c  .generated_files/flags/default/f22e1e4494a41745629358979b3fa28cac6ef162 .generated_files/flags/default/da39a3ee5e6b4b0d3255bfef95601890afd80709
+else
+${OBJECTDIR}/adc/adc.o: adc/adc.c  .generated_files/flags/default/6a3c5b1c6dd8b9c95946d6b8f751d32a49d1eae0 .generated_files/flags/default/da39a3ee5e6b4b0d3255bfef95601890afd80709
 	@${MKDIR} "${OBJECTDIR}/adc" 
 	@${RM} ${OBJECTDIR}/adc/adc.o.d 
 	@${RM} ${OBJECTDIR}/adc/adc.o 
-	 ${MP_CC}  $(MP_EXTRA_CC_PRE) -mmcu=atmega328p ${PACK_COMPILER_OPTIONS} ${PACK_COMMON_OPTIONS} -g -DDEBUG  -gdwarf-2  -x c -c -D__$(MP_PROCESSOR_OPTION)__  -funsigned-char -funsigned-bitfields -Os -ffunction-sections -fdata-sections -fpack-struct -fshort-enums -Wall -MD -MP -MF "${OBJECTDIR}/adc/adc.o.d" -MT "${OBJECTDIR}/adc/adc.o.d" -MT ${OBJECTDIR}/adc/adc.o  -o ${OBJECTDIR}/adc/adc.o adc/adc.c  -DXPRJ_default=$(CND_CONF)  $(COMPARISON_BUILD) 
+	 ${MP_CC}  $(MP_EXTRA_CC_PRE) -mmcu=atmega328p ${PACK_COMPILER_OPTIONS} ${PACK_COMMON_OPTIONS}  -x c -c -D__$(MP_PROCESSOR_OPTION)__  -funsigned-char -funsigned-bitfields -Os -ffunction-sections -fdata-sections -fpack-struct -fshort-enums -Wall -MD -MP -MF "${OBJECTDIR}/adc/adc.o.d" -MT "${OBJECTDIR}/adc/adc.o.d" -MT ${OBJECTDIR}/adc/adc.o  -o ${OBJECTDIR}/adc/adc.o adc/adc.c  -DXPRJ_default=$(CND_CONF)  $(COMPARISON_BUILD) 
 	
-else
 ${OBJECTDIR}/lcdan/lcdan.o: lcdan/lcdan.c  .generated_files/flags/default/87686bd4d2c1cbfbe3940561dc37915ca2bd3c9e .generated_files/flags/default/da39a3ee5e6b4b0d3255bfef95601890afd80709
 	@${MKDIR} "${OBJECTDIR}/lcdan" 
 	@${RM} ${OBJECTDIR}/lcdan/lcdan.o.d 
@@ -158,12 +164,6 @@ ${OBJECTDIR}/main.o: main.c  .generated_files/flags/default/5abb6aaddc1b0216789c
 	@${RM} ${OBJECTDIR}/main.o.d 
 	@${RM} ${OBJECTDIR}/main.o 
 	 ${MP_CC}  $(MP_EXTRA_CC_PRE) -mmcu=atmega328p ${PACK_COMPILER_OPTIONS} ${PACK_COMMON_OPTIONS}  -x c -c -D__$(MP_PROCESSOR_OPTION)__  -funsigned-char -funsigned-bitfields -Os -ffunction-sections -fdata-sections -fpack-struct -fshort-enums -Wall -MD -MP -MF "${OBJECTDIR}/main.o.d" -MT "${OBJECTDIR}/main.o.d" -MT ${OBJECTDIR}/main.o  -o ${OBJECTDIR}/main.o main.c  -DXPRJ_default=$(CND_CONF)  $(COMPARISON_BUILD) 
-	
-${OBJECTDIR}/adc/adc.o: adc/adc.c  .generated_files/flags/default/6a3c5b1c6dd8b9c95946d6b8f751d32a49d1eae0 .generated_files/flags/default/da39a3ee5e6b4b0d3255bfef95601890afd80709
-	@${MKDIR} "${OBJECTDIR}/adc" 
-	@${RM} ${OBJECTDIR}/adc/adc.o.d 
-	@${RM} ${OBJECTDIR}/adc/adc.o 
-	 ${MP_CC}  $(MP_EXTRA_CC_PRE) -mmcu=atmega328p ${PACK_COMPILER_OPTIONS} ${PACK_COMMON_OPTIONS}  -x c -c -D__$(MP_PROCESSOR_OPTION)__  -funsigned-char -funsigned-bitfields -Os -ffunction-sections -fdata-sections -fpack-struct -fshort-enums -Wall -MD -MP -MF "${OBJECTDIR}/adc/adc.o.d" -MT "${OBJECTDIR}/adc/adc.o.d" -MT ${OBJECTDIR}/adc/adc.o  -o ${OBJECTDIR}/adc/adc.o adc/adc.c  -DXPRJ_default=$(CND_CONF)  $(COMPARISON_BUILD) 
 	
 endif
 

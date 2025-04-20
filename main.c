@@ -91,7 +91,7 @@ float vout;
 
 float voltage_step;
 
-#define VOUT_OFFSET 12.2E-3 //Voltaje en reposo
+#define VOUT_OFFSET 11.3E-3 //Voltaje en reposo
 
 volatile struct _isr_flag
 {
@@ -160,23 +160,32 @@ uint8_t get_pwm_bitresol(void)
 int8_t updatePWMRegsIfChange(uint8_t PWM_RESOL_SELECTED)
 {  
     uint8_t PWM_RESOL_SELECTED_latest = eeprom_read_byte(&PWM_RESOL_SELECTED_EEMEM);
+    uint16_t OCR1A_temp = 0;
     
     if (PWM_RESOL_SELECTED_latest != PWM_RESOL_SELECTED)
     {
         //Disable output pin
         ConfigInputPin(DDRB, 1); 
         
-        
-        
         if ((PWM_RESOL_SELECTED_latest > 0) && (OCR1A>0))
         {
             float factor = ((float)OCR1A)/(((uint32_t)0x00001<<PWM_RESOL_SELECTED_latest)); //antiguo//factor = OCR actual/2^x;
-            OCR1A = (uint16_t) (((uint32_t)0x00001<<PWM_RESOL_SELECTED)*factor);            //nuevo//OCR = 2^new*factor;
+            //OCR1A = (uint16_t) (((uint32_t)0x00001<<PWM_RESOL_SELECTED)*factor);            //nuevo//OCR = 2^new*factor;
+            OCR1A_temp = (uint16_t) (((uint32_t)0x00001<<PWM_RESOL_SELECTED)*factor);            //nuevo//OCR = 2^new*factor;
         }
         else
         {
-            OCR1A = 0;
+            //OCR1A = 0;
+            OCR1A_temp = 0;
         }
+        
+        if (OCR1A_temp == 0)
+        {
+            PinTo0(PORTB,1);
+            BitTo0(TCCR1A,COM1A1);
+        }
+        OCR1A = OCR1A_temp;
+        
         ICR1 = (uint16_t) (((uint32_t)0x00001<<PWM_RESOL_SELECTED) -1);
         //Enable output pin
         ConfigOutputPin(DDRB, 1); 
@@ -194,7 +203,7 @@ int8_t updatePWMRegsIfChange(uint8_t PWM_RESOL_SELECTED)
         print_OCR1A(OCR1A);
         
         lcdan_set_cursor_in_row1(0);
-        lcdan_print_string("Update!!!!");
+        lcdan_print_string("Update!!!");
 
         return 1;
     }
@@ -234,12 +243,21 @@ int main(void)
     TCNT1 = 0;
     //
     
+
+    
     PWM_RESOL_SELECTED = get_pwm_bitresol();
     if (!updatePWMRegsIfChange(PWM_RESOL_SELECTED))//if not change, then, load from EEPROM
     {
         //Si no ha cambiado, entonces carga directamente de EEPROM al iniciar el programa
         ICR1 = eeprom_read_word(&ICR1_EEMEM);
-        OCR1A = eeprom_read_word(&OCR1A_EEMEM);
+        
+        uint16_t OCR1A_temp = eeprom_read_word(&OCR1A_EEMEM);
+        if (OCR1A_temp == 0)
+        {
+            PinTo0(PORTB,1);
+            BitTo0(TCCR1A,COM1A1);
+        }
+        OCR1A = OCR1A_temp;
         
         ConfigOutputPin(DDRB, 1); //OC1A
         
@@ -251,14 +269,16 @@ int main(void)
         lcdan_set_cursor_in_row1(0);
         lcdan_print_string("NoUpdate");
     }
+    
+    
 //    else
 //    {
 //        lcdan_set_cursor_in_row1(0);
 //        lcdan_print_string("Update!");
 //    }
     
-//    vout = eeprom_read_float(&vout_EEMEM);
-//    print_vout(vout + VOUT_OFFSET);
+    vout = eeprom_read_float(&vout_EEMEM);
+    print_vout(vout + VOUT_OFFSET);
 
 //    OCR1A = 0x0000; 
 //    while (1);
@@ -288,7 +308,18 @@ int main(void)
                     //
                     if (pinGetLevel_level(PGLEVEL_LYOUT_KB_MINUS) == 0) //active in low
                     {
+                        //
                         OCR1A--;
+                        if (OCR1A == 0)
+                        {
+                            PinTo0(PORTB,1);
+                            BitTo0(TCCR1A,COM1A1);
+                        }
+                        else
+                        {
+                            BitTo1(TCCR1A,COM1A1);
+                        }
+                        //
                         vout -= voltage_step;//
                         print_vout(vout + VOUT_OFFSET);
                         
@@ -310,7 +341,18 @@ int main(void)
                     //
                     if (pinGetLevel_level(PGLEVEL_LYOUT_KB_PLUS) == 0) //active in low
                     {
+                        //
                         OCR1A++;
+                        if (OCR1A == 0)
+                        {
+                            PinTo0(PORTB,1);
+                            BitTo0(TCCR1A,COM1A1);
+                        }
+                        else
+                        {
+                            BitTo1(TCCR1A,COM1A1);
+                        }
+                        
                         vout += voltage_step ;
                         print_vout(vout + VOUT_OFFSET);
                         
