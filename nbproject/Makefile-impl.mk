@@ -24,7 +24,7 @@ CLEAN_SUBPROJECTS=${CLEAN_SUBPROJECTS_${SUBPROJECTS}}
 
 
 # Project Name
-PROJECTNAME=ATmega328Pmplabx.X
+PROJECTNAME=ATmega328Pmplabx0-10v.X
 
 # Active Configuration
 DEFAULTCONF=default

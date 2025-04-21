@@ -3,7 +3,7 @@
     <type>com.microchip.mplab.nbide.embedded.makeproject</type>
     <configuration>
         <data xmlns="http://www.netbeans.org/ns/make-project/1">
-            <name>ATmega328Pmplabx</name>
+            <name>ATmega328Pmplabx0-10v</name>
             <creation-uuid>04a606eb-de59-40c3-ad3d-72f7b6d1c08c</creation-uuid>
             <make-project-type>0</make-project-type>
             <sourceEncoding>ISO-8859-1</sourceEncoding>

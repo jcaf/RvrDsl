@@ -1,6 +1,7 @@
-/*MPLAX IDE v6.25
+/* vout 0-10V
+ * MPLAX IDE v6.25
  * AVR GNU TOOL CHAIN 
- *  
+ * Version Final en RD Dental el dia 23 de Abril de 2025
  * File:   main.c
  * Author: jcaf
  *
@@ -90,8 +91,9 @@ float EEMEM vout_EEMEM = 0;
 float vout; 
 
 float voltage_step;
+//uint16_t OCR1Acopy = 0;
 
-#define VOUT_OFFSET 11.3E-3 //Voltaje en reposo
+#define VOUT_OFFSET 11.0E-3 //Voltaje en reposo
 
 volatile struct _isr_flag
 {
@@ -149,6 +151,7 @@ void print_OCR1A(uint16_t ocr1a)
     itoa(ocr1a,buff ,10);
     lcdan_set_cursor_in_row1(11);
     lcdan_print_string(buff);
+    lcdan_print_string("    ");
 }
 
 uint8_t get_pwm_bitresol(void)
@@ -218,7 +221,7 @@ int8_t updatePWMRegsIfChange(uint8_t PWM_RESOL_SELECTED)
 int main(void)
 {
     int counter0 = 0;
-    int counter1 = 0;
+    //int counter1 = 0;
     
     ADC_config2ReadPotSetVoltStep();
     
@@ -270,18 +273,9 @@ int main(void)
         lcdan_print_string("NoUpdate");
     }
     
-    
-//    else
-//    {
-//        lcdan_set_cursor_in_row1(0);
-//        lcdan_print_string("Update!");
-//    }
-    
     vout = eeprom_read_float(&vout_EEMEM);
     print_vout(vout + VOUT_OFFSET);
 
-//    OCR1A = 0x0000; 
-//    while (1);
    
     while (1)
     {
@@ -309,29 +303,31 @@ int main(void)
                     if (pinGetLevel_level(PGLEVEL_LYOUT_KB_MINUS) == 0) //active in low
                     {
                         //
-                        OCR1A--;
-                        if (OCR1A == 0)
+                        if (!mainflag.lock_keyminus)
                         {
-                            PinTo0(PORTB,1);
-                            BitTo0(TCCR1A,COM1A1);
-                        }
-                        else
-                        {
-                            BitTo1(TCCR1A,COM1A1);
-                        }
-                        //
-                        vout -= voltage_step;//
-                        print_vout(vout + VOUT_OFFSET);
+                            mainflag.lock_keyplus = 0;
+                            
+                            OCR1A--;
                         
-//                        lcdan_set_cursor_in_row1(15);
-//                        lcdan_print_string("-");
-
-                        counter1 = 0;
-                        mainflag.clearSignPlusMinus = 1;
-                        
-                        eeprom_update_word(&OCR1A_EEMEM, OCR1A);
-                        eeprom_update_float(&vout_EEMEM, vout);
-                        print_OCR1A(OCR1A);
+                            if (OCR1A == 0)
+                            {
+                                PinTo0(PORTB,1);
+                                BitTo0(TCCR1A,COM1A1);
+                                
+                                mainflag.lock_keyminus = 1;//lock
+                            }
+//                            else
+//                            {
+//                                BitTo1(TCCR1A,COM1A1);
+//                            }
+                            //
+                            vout -= voltage_step;//
+                            print_vout(vout + VOUT_OFFSET);
+                            //
+                            eeprom_update_word(&OCR1A_EEMEM, OCR1A);
+                            eeprom_update_float(&vout_EEMEM, vout);
+                            print_OCR1A(OCR1A);
+                        }
                     }
                 }
                 //+
@@ -342,47 +338,29 @@ int main(void)
                     if (pinGetLevel_level(PGLEVEL_LYOUT_KB_PLUS) == 0) //active in low
                     {
                         //
-                        OCR1A++;
-                        if (OCR1A == 0)
+                        if (!mainflag.lock_keyplus)
                         {
-                            PinTo0(PORTB,1);
-                            BitTo0(TCCR1A,COM1A1);
+                            //
+                            mainflag.lock_keyminus = 0;
+                            //
+                            OCR1A++;
+                            BitTo1(TCCR1A,COM1A1);//Habilita salida de pin para PWM
+                            //
+                            if (OCR1A >= ICR1)
+                            {
+                                mainflag.lock_keyplus = 1;
+                            }
+                            
+                            vout += voltage_step ;
+                            print_vout(vout + VOUT_OFFSET);
+
+                            eeprom_update_word(&OCR1A_EEMEM, OCR1A);
+                            eeprom_update_float(&vout_EEMEM, vout);
+                            print_OCR1A(OCR1A);
                         }
-                        else
-                        {
-                            BitTo1(TCCR1A,COM1A1);
-                        }
-                        
-                        vout += voltage_step ;
-                        print_vout(vout + VOUT_OFFSET);
-                        
-//                        lcdan_set_cursor_in_row1(15);
-//                        lcdan_print_string("+");
-//                        
-                        counter1 = 0;
-                        mainflag.clearSignPlusMinus = 1;
-                        
-                        eeprom_update_word(&OCR1A_EEMEM, OCR1A);
-                        eeprom_update_float(&vout_EEMEM, vout);
-                        print_OCR1A(OCR1A);
                     }
                 }
                // 
-            }
-        }
-        //
-        if (mainflag.clearSignPlusMinus)
-        {
-            if (mainflag.sysTickMs)
-            {
-                if (++counter1 >= (100/ SYSTICK_MS))
-                {
-                    counter1  = 0;
-                    mainflag.clearSignPlusMinus = 0;
-
-//                    lcdan_set_cursor_in_row1(15);
-//                    lcdan_print_string(" ");
-                }
             }
         }
         
