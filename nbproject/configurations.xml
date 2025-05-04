@@ -86,11 +86,6 @@
       <AVR-AR>
         <property key="archiver-flags" value="-r"/>
       </AVR-AR>
-      <AVR-AS>
-        <property key="announce-version" value="false"/>
-        <property key="include-paths" value=""/>
-        <property key="suppress-warnings" value="false"/>
-      </AVR-AS>
       <AVR-CPP>
         <property key="additional-warnings" value="true"/>
         <property key="call-prologues" value="false"/>

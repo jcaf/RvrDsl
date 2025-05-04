@@ -73,8 +73,9 @@ ans = 1.5259e-04
 #define VOUT_MAX 10.0f         //Volts
 
 #define PWM_BIT_RESOL_MAX 16
-#define PWM_BIT_RESOL_MIN 10
-#define POTENCIOMETRO_CALIBRACION_STEP_ADC_BIT_RESOL 8 //8bits suficiente para seleccionar entre 10 - 16 bits de PWM resol.
+#define PWM_BIT_RESOL_MIN 7
+
+#define POTENCIOMETRO_CALIBRACION_STEP_ADC_BIT_RESOL 8 //8bits suficiente para seleccionar entre 7 - 16 bits de PWM resol.
 #define CALIBSTEP_ADC_VALUE_MAX  ((1<<POTENCIOMETRO_CALIBRACION_STEP_ADC_BIT_RESOL)-1)
 #define CALIBSTEP_ADC_VALUE_MIN  0
         
@@ -93,7 +94,7 @@ float vout;
 float voltage_step;
 //uint16_t OCR1Acopy = 0;
 
-#define VOUT_OFFSET 11.0E-3 //Voltaje en reposo
+#define VOUT_OFFSET 0//11.0E-3 //Voltaje en reposo
 
 volatile struct _isr_flag
 {
@@ -124,7 +125,6 @@ void print_vout(float vout)
     char buff[20];
     dtostrf(vout,0,6, buff);
     lcdan_set_cursor_in_row1(0);
-    //lcdan_print_string("V=");
     lcdan_print_string(buff);
     lcdan_print_string("v");
 }
@@ -159,39 +159,40 @@ uint8_t get_pwm_bitresol(void)
     uint8_t adclow = ADCL;//Captura la conversion actual, pero uso ADCH
     return  (uint8_t) ((ADCH*EQUATION_m) +  EQUATION_b);
 }
+            
 
 int8_t updatePWMRegsIfChange(uint8_t PWM_RESOL_SELECTED)
 {  
+    uint16_t OCR1A_temp;
     uint8_t PWM_RESOL_SELECTED_latest = eeprom_read_byte(&PWM_RESOL_SELECTED_EEMEM);
-    uint16_t OCR1A_temp = 0;
     
-    if (PWM_RESOL_SELECTED_latest != PWM_RESOL_SELECTED)
+    
+    if (PWM_RESOL_SELECTED_latest != PWM_RESOL_SELECTED)    //hay una diferencia
     {
-        //Disable output pin
-        ConfigInputPin(DDRB, 1); 
         
-        if ((PWM_RESOL_SELECTED_latest > 0) && (OCR1A>0))
+        OCR1A_temp = 0;                         //valor inicial antes de evaluar si OCR1A = 0?
+                
+        if (PWM_RESOL_SELECTED_latest > 0) 
         {
-            float factor = ((float)OCR1A)/(((uint32_t)0x00001<<PWM_RESOL_SELECTED_latest)); //antiguo//factor = OCR actual/2^x;
-            //OCR1A = (uint16_t) (((uint32_t)0x00001<<PWM_RESOL_SELECTED)*factor);            //nuevo//OCR = 2^new*factor;
-            OCR1A_temp = (uint16_t) (((uint32_t)0x00001<<PWM_RESOL_SELECTED)*factor);            //nuevo//OCR = 2^new*factor;
+            if (OCR1A > 0)    //si es 0, OCR1A_temp pondra a OCR1A = 0
+            {
+                float factor = ((float)OCR1A)/(((uint32_t)0x00001<<PWM_RESOL_SELECTED_latest)); //antiguo//factor = OCR actual/2^x;
+                OCR1A_temp = (uint16_t) (((uint32_t)0x00001<<PWM_RESOL_SELECTED)*factor);            //nuevo//OCR = 2^new*factor;
+            }
         }
-        else
-        {
-            //OCR1A = 0;
-            OCR1A_temp = 0;
-        }
-        
+        //en este punto, OCR1A_temp tiene un valor final
         if (OCR1A_temp == 0)
         {
-            PinTo0(PORTB,1);
+            //si OCR1A es 0, entonces el dutycycle es un glitch, ver datasheet.
+            PinTo0(PORTB,1);            //por eso deshabilito la funcion de PWM y vuelvo a conf. el pin de salida a 0
             BitTo0(TCCR1A,COM1A1);
         }
+        //casi atomico estas 4 instrucciones
+        ConfigInputPin(DDRB, 1); //Disable output pin
         OCR1A = OCR1A_temp;
-        
         ICR1 = (uint16_t) (((uint32_t)0x00001<<PWM_RESOL_SELECTED) -1);
-        //Enable output pin
-        ConfigOutputPin(DDRB, 1); 
+        ConfigOutputPin(DDRB, 1); //Enable output pin
+        //
 
         eeprom_update_word(&OCR1A_EEMEM, OCR1A);
         eeprom_update_word(&ICR1_EEMEM, ICR1);
@@ -246,8 +247,6 @@ int main(void)
     TCNT1 = 0;
     //
     
-
-    
     PWM_RESOL_SELECTED = get_pwm_bitresol();
     if (!updatePWMRegsIfChange(PWM_RESOL_SELECTED))//if not change, then, load from EEPROM
     {
@@ -261,7 +260,6 @@ int main(void)
             BitTo0(TCCR1A,COM1A1);
         }
         OCR1A = OCR1A_temp;
-        
         ConfigOutputPin(DDRB, 1); //OC1A
         
         voltage_step = (float)(VOUT_MAX/((uint32_t)0x00001<<PWM_RESOL_SELECTED));
@@ -272,11 +270,14 @@ int main(void)
         lcdan_set_cursor_in_row1(0);
         lcdan_print_string("NoUpdate");
     }
+
+    //Si hay un cambio, entonces debe pedir un ciclo de power para emparejar con el valor de su Vpaso actual
     
     vout = eeprom_read_float(&vout_EEMEM);
     print_vout(vout + VOUT_OFFSET);
+//new
+//OCR1A = (vout/VOUT_MAX)*((uint16_t) (((uint32_t)0x00001<<PWM_RESOL_SELECTED) -1));
 
-   
     while (1)
     {
         if (isr_flag.sysTickMs)
@@ -307,7 +308,10 @@ int main(void)
                         {
                             mainflag.lock_keyplus = 0;
                             
-                            OCR1A--;
+                            if (OCR1A>0)
+                            {
+                                OCR1A--;    
+                            }
                         
                             if (OCR1A == 0)
                             {
@@ -316,10 +320,7 @@ int main(void)
                                 
                                 mainflag.lock_keyminus = 1;//lock
                             }
-//                            else
-//                            {
-//                                BitTo1(TCCR1A,COM1A1);
-//                            }
+                            
                             //
                             vout -= voltage_step;//
                             print_vout(vout + VOUT_OFFSET);
@@ -343,10 +344,14 @@ int main(void)
                             //
                             mainflag.lock_keyminus = 0;
                             //
-                            OCR1A++;
+                            if (OCR1A < ICR1)
+                            {
+                                OCR1A++;    
+                            }
+                            
                             BitTo1(TCCR1A,COM1A1);//Habilita salida de pin para PWM
                             //
-                            if (OCR1A >= ICR1)
+                            if (OCR1A == ICR1)
                             {
                                 mainflag.lock_keyplus = 1;
                             }
